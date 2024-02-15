@@ -1,23 +1,25 @@
-FROM jenkins/jenkins
+# Usamos una imagen de base como node
+FROM node:latest AS build
 
-USER root
+# Ponemos el directorio de trabajo en /app
+WORKDIR /app
 
-#Instalamos como Root nodejs y npm
-RUN apt-get update && \
-    apt-get install -y curl && \
-    curl -sL https://deb.nodesource.com/setup_14.x | bash - && \  
-    apt-get install -y nodejs && \ 
-    apt-get install -y npm
+# Copiamos los json para instalar las dependencias
+COPY package*.json ./
 
-#Para poder hacer npm install, necesitamos darle permisos de escritura a otros en node_modules.
-RUN mkdir /usr/local/lib/node_modules && \
-	chmod -R o+w /usr
+# Instalamos las dependencias
+RUN npm install
 
-USER jenkins
+# Copiamos los archivos de la app al docker
+COPY . .
 
-#Puerto para acceder al administrador de Jenkins
-EXPOSE 8080 
-#Puerto para comunicaciones con los agentes de Jenkins
-EXPOSE 5000
-#Puerto para el despliegue en node.
-EXPOSE 3000
+# Construimos la app del docker gracias a npm
+RUN npm run build
+
+# Ahora utilizamos una imagen de apache
+FROM httpd:latest
+
+# Copiamos el build de antes en el htdocs de apache
+COPY --from=build /app/build/ /usr/local/apache2/htdocs/
+
+EXPOSE 80
